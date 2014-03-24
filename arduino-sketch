@@ -1,0 +1,164 @@
+#include <SoftwareSerial.h>  
+
+
+//-----------[ GLOBL VARIABLES
+                        
+int bluetoothTx = 2;    // TX-O pin of bluetooth mate, Arduino D2
+int bluetoothRx = 3;    // RX-I pin of bluetooth mate, Arduino D3
+
+int led6 = 6;           // BLUE
+int led7 = 7;           // RED
+
+int cTime = 10000;       // Connection Timeout
+int rTime = 10000;      // Re-Connection Timeout
+
+boolean ul;             // Unlocked
+boolean r = true;       // Reconnect
+
+SoftwareSerial bluetooth(bluetoothTx, bluetoothRx);
+
+void setup()
+{
+  pinMode(led6, OUTPUT);
+  pinMode(led7, OUTPUT);
+  pinMode(8, OUTPUT); // Setup the ToggleButton mod_Btn1 data pin
+  pinMode(9, OUTPUT); // Setup the ToggleButton mod_Btn2 data pin
+  pinMode(10, OUTPUT); // Setup the ToggleButton mod_Btn3 data pin
+  
+  Serial.begin(9600);                                                     // Begin the serial monitor at 9600bps
+  bluetooth.begin(115200);                                                // The Bluetooth Mate defaults to 115200bps
+  bluetooth.print("$");                                                   // Print three times individually
+  bluetooth.print("$");
+  bluetooth.print("$");                                                   // Enter command mode
+  delay(100);                                                             // Short delay, wait for the Mate to send back CMD
+  bluetooth.println("U,9600,N");                                          // Temporarily Change the baudrate to 9600, no parity
+  delay(100);
+  bluetooth.begin(9600);                                                  // Start bluetooth serial at 9600
+  onStart();                                                              // On Power up: Wait 20 Seconds: Then lock doors
+}
+
+void loop()
+{ 
+                                                                          // LOCAL VARIABLES:
+  char c = bluetooth.find("%CONNECT,30196692D7C0,0");                     // Set variable: Read bluetooth and find %CONNECT,30196692D7C0,0 string
+  char d = bluetooth.find("%DISCONNECT");                                 // Set variable: Read bluetooth and find %DISCONNECT string
+
+  if(c){                                                                  // Find %Connect String...
+    unlock();                                                             // Unlock the doors
+  }else if(d){                                                            // Find %Disconnect String...
+    lock();                                                               // Lock the doors
+  }else{                                                                  // If you can't find either string then...
+    if(ul){                                                               // Check if Car is Unlocked...
+      if (dStatus()){                                                     // Now check to see if it's disconnected...
+        lock();                                                           // Lock the doors
+      }                                                                   // BUT
+    }else{                                                                // If Car is Locked... Check to see if connected...
+      if (cStatus()){                                                     // If it's connected
+        unlock();                                                         // Unlock the doors
+      }
+    }
+  }
+  
+  if(r){                                                                  // Check to see if r(reconnected) is true...
+    reconnect();                                                          // If it is then reconnect
+  }
+  
+}//END: loop
+
+
+//-----------[ FUNCTIONS
+
+void onStart(){
+    delay(15000);
+    ul = true;
+}
+
+
+int cStatus(){
+    delay(cTime);
+    bluetooth.print("$");                           // Print three times individually
+    bluetooth.print("$");
+    bluetooth.print("$");                           // Enter command mode
+    delay(100);                                     // Short delay, wait for the Silver to send back CMD
+    bluetooth.println("GK");                        // Connect to the blutooth address
+    delay(100);
+    bluetooth.println("---");                       // Close out CMD
+    delay(100);
+    
+    char cs = bluetooth.find("1,0,0");              //Find Connection
+    
+    if (cs)                                         //Connection found: TRUE
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+    
+    bluetooth.flush();
+}
+
+
+
+int dStatus(){
+    delay(cTime);
+    bluetooth.print("$");                     // Print three times individually
+    bluetooth.print("$");
+    bluetooth.print("$");                     // Enter command mode
+    delay(100);                               // Short delay, wait for the Silver to send back CMD
+    bluetooth.println("GK");                  // Connect to the blutooth address
+    delay(100);
+    bluetooth.println("---");                 // Close out CMD
+    delay(100);
+    
+    char ds = bluetooth.find("0,0,0");        //Find No Connection
+    
+    if (ds)                                   //Connection found: TRUE
+    {
+      return 1;
+    }
+    else
+    {
+      return 0;
+    }
+    
+    bluetooth.flush();
+}
+
+void reconnect()
+{
+    bluetooth.print("$");                     // Print three times individually
+    bluetooth.print("$");
+    bluetooth.print("$");                     // Enter command mode
+    delay(100);                               // Short delay, wait for the Silver to send back CMD
+    bluetooth.println("C,30196692D7C0");      // Connect to the blutooth address
+    delay(500);
+    bluetooth.println("---");                 // Close out CMD
+    delay(rTime);
+}
+
+void unlock(){
+  ul = true;
+  r = false;
+  Serial.println("unlock");
+  digitalWrite(led6, HIGH);
+  delay(100); 
+  digitalWrite(led7, LOW); 
+  digitalWrite(9, HIGH);  // if 1, switch relay2 On
+  delay(100);
+  digitalWrite(9, LOW);  // if 0, switch relay2 Off  
+    
+}
+
+void lock(){
+  ul = false;
+  r = true;
+  Serial.println("lock");
+  digitalWrite(led7, HIGH);
+  delay(100); 
+  digitalWrite(led6, LOW);
+  digitalWrite(8, HIGH);  // if 1, switch relay1 On
+  delay(100);
+  digitalWrite(8, LOW);  // if 0, switch relay1 Off 
+}
