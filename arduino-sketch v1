@@ -1,3 +1,16 @@
+/*
+ Carduino
+ by: Jordan Cannon
+ www.carduino.vonini.com
+ date: March 25, 2014
+ license: Public domain
+ Version 1.0
+
+ This sketch listens to the BlueSMiRF to see if a device(phone) is connected.
+ If it is connected then it will unlock the doors. If it is not connected 
+ then it will lock the doors.
+ */ 
+
 //===================================================[ INCLUDED LIBRARIES
 
 #include <SoftwareSerial.h>  
@@ -141,7 +154,7 @@ int dStatus(){
 
 void reconnect()
 {
-    cPrint("C," + bta );
+    cPrint("C," + bta );                                                // Connect to the bluetooth address provided
 }
 
 //--------------------------------------------------[ Unlock car
