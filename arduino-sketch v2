@@ -1,0 +1,177 @@
+//===================================================[ INCLUDED LIBRARIES
+
+#include <SoftwareSerial.h>  
+
+
+//===================================================[ GLOBAL VARIABLES
+
+//--------------------------------------------------[ Integers : Numbers
+                        
+int bluetoothTx = 3;                                                      // TX-O pin of bluetooth mate, Arduino D2
+int bluetoothRx = 2;                                                      // RX-I pin of bluetooth mate, Arduino D3
+
+int ledB = 13;                                                            // BLUE
+int ledR = 12;                                                            // RED
+
+int cTime = 2000;                                                         // Connection Time
+
+//--------------------------------------------------[ Booleans : TRUE or FALSE
+
+boolean ul;                                                               // Unlocked
+boolean r = true;                                                         // Reconnect
+
+//--------------------------------------------------[ Strings
+
+String bta = "30196692D7C0";                                              // Bluetooth Address
+
+//--------------------------------------------------[ Other
+
+SoftwareSerial bluetooth(bluetoothTx, bluetoothRx);
+
+//===================================================[ ON ARDUINO BOOT
+
+void setup()
+{
+  pinMode(ledB, OUTPUT);                                                  // LED : Blue
+  pinMode(ledR, OUTPUT);                                                  // LED : Red
+  pinMode(7, OUTPUT);                                                     // ReLAY INT 4 : Bluesmirf
+  pinMode(8, OUTPUT);                                                     // ReLAY INT 3 : Lights
+  pinMode(9, OUTPUT);                                                     // ReLAY INT 2 : Unlock
+  pinMode(10, OUTPUT);                                                    // ReLAY INT 1 : Lock
+
+  Serial.begin(9600);                                                     // Begin the serial monitor at 9600bps
+  bluetooth.begin(115200);                                                // The Bluetooth Mate defaults to 115200bps
+  bluetooth.print("$");                                                   // Print three times individually
+  bluetooth.print("$");
+  bluetooth.print("$");                                                   // Enter command mode
+  delay(100);                                                             // Short delay, wait for the Mate to send back CMD
+  bluetooth.println("U,9600,N");                                          // Temporarily Change the baudrate to 9600, no parity
+  delay(100);                                                             // Wait
+  bluetooth.begin(9600);                                                  // Start bluetooth serial at 9600
+  onStart();                                                              // On Power up: Wait 20 Seconds: Then lock doors
+}
+
+//===================================================[ LOOP CONTINIOUSLY
+
+void loop()
+{ 
+                                                                          // LOCAL VARIABLES:
+  char c = bluetooth.find("%CONNECT,30196692D7C0,0");                     // Set variable: Read bluetooth and find %CONNECT,30196692D7C0,0 string
+  char d = bluetooth.find("%DISCONNECT");                                 // Set variable: Read bluetooth and find %DISCONNECT string
+
+  if(c){                                                                  // Find %Connect String...
+    unlock();                                                             // Unlock the doors
+  }else if(d){                                                            // Find %Disconnect String...
+    lock();                                                               // Lock the doors
+  }else{                                                                  // If you can't find either string then...
+    if(ul){                                                               // Check if Car is Unlocked...
+      if (dStatus()){                                                     // Now check to see if bluesmirf and phone are disconnected...
+        lock();                                                           // If it's disconnected : Lock the doors
+      }                                                                   // BUT
+    }else{                                                                // If Car is Locked...
+      if (cStatus()){                                                     // Check to see if bluesmirf and phone are connected...
+        unlock();                                                         // If it's connected : unlock the doors
+      }
+    }
+  }
+  
+  if(r){                                                                  // Check to see if r(reconnect) is true...
+    reconnect();                                                          // If it is TRUE then reconnect
+  }
+  
+}//END: loop
+
+
+//===================================================[ FUNCTIONS
+
+//--------------------------------------------------[ Run this on Arduino boot
+
+void onStart(){
+    delay(2000);
+    ul = true;
+}
+
+//--------------------------------------------------[ Access CMD and print AT Commands to the bluesmirf
+
+void cPrint(String command){
+    delay(cTime);                                                        // Wait
+    bluetooth.print("$");                                                // Print three times individually
+    bluetooth.print("$");
+    bluetooth.print("$");                                                // Enter command mode (CMD)
+    delay(100);                                                          // Short delay, wait for the Silver to send back CMD
+    bluetooth.println(command);                                          // Print AT Command to the CMD
+    delay(100);                                                          // Wait
+    bluetooth.println("---");                                            // Close out CMD
+    delay(100);                                                          // wait
+}
+
+//--------------------------------------------------[ Check if bluesmirf is connected to a device : Return TRUE or FALSE
+
+int cStatus(){
+    
+    cPrint("GK");                                                        // Connect to bluesmirf, print AT Command GK (GK returns a value of 0,0,0[if no connected devices] or 1,0,0[if device is connected])
+  
+    char cs = bluetooth.find("1,0,0");                                   // Look for the value 1,0,0, if you find it then return TRUE
+    
+    if(cs){                                         
+      return 1;                                                          // TRUE: 1,0,0 was found which means there is a device connected
+    }else{
+      return 0;                                                          // FALSE: void
+    }  
+    bluetooth.flush();                                                   // Flush any strings or character left over in the bluetooth
+}
+
+//--------------------------------------------------[ Check if bluesmirf is not connected to a device : Return TRUE or FALSE
+
+int dStatus(){
+  
+    cPrint("GK");                                                       // Connect to bluesmirf, print AT Command GK (GK returns a value of 0,0,0[if no connected devices] or 1,0,0[if device is connected])
+    
+    char ds = bluetooth.find("0,0,0");                                  // Look for the value 0,0,0, if you find it then return TRUE
+    
+    if(ds){                                                             // TRUE: 0,0,0 was found which means there is no devices connected
+      return 1;
+    }else{                                                              // FALSE: void
+      return 0;
+    } 
+    bluetooth.flush();                                                  // Flush any strings or character left over in the bluetooth
+}
+
+//--------------------------------------------------[ Enter CMD mode on bluesmirf and try to connect to the bluetooth address provided
+
+void reconnect()
+{
+    cPrint("C," + bta );
+}
+
+//--------------------------------------------------[ Unlock car
+
+void unlock(){
+  ul = true;
+  r = false;
+  
+  digitalWrite(ledR, LOW); 
+  delay(10);   
+  digitalWrite(ledB, HIGH);
+  
+  Serial.println("unlock");
+
+}
+
+//--------------------------------------------------[ Lock car
+
+void lock(){
+  ul = false;
+  r = true;
+  
+  digitalWrite(ledB, LOW); 
+  delay(10);   
+  digitalWrite(ledR, HIGH);
+  
+  Serial.println("lock");
+  
+  digitalWrite(10, HIGH);  // Turn on ReLAY
+  delay(500);
+  digitalWrite(10, LOW);  // Turn off ReLAY 
+  
+}
